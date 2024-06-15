@@ -1,6 +1,7 @@
+use crate::common;
 use std::io::{self, BufRead, Write};
 use std::net::{self, TcpStream};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 
 pub struct MpdClient<'a> {
   pub host: &'a str,
@@ -40,7 +41,7 @@ impl<'a> MpdClient<'a> {
     }
   }
 
-  pub fn get_artist_albums(&mut self) -> io::Result<HashMap<String, HashSet<String>>> {
+  pub fn all_albums(&mut self) -> io::Result<HashMap<String, Vec<common::Release>>> {
     let response = self.send_command("list album group artist")?;
 
     let mut artists = HashMap::new();
@@ -50,18 +51,43 @@ impl<'a> MpdClient<'a> {
       if line.starts_with("Artist: ") {
         let Some(artist) = line.strip_prefix("Artist: ") else { continue; };
 
-        artists.insert(artist.to_owned(), HashSet::new());
+        artists.insert(artist.to_owned(), Vec::new());
         recent_artist = Some(artist.to_owned());
       } else if line.starts_with("Album: ") {
         let Some(ref artist) = recent_artist else { continue; };
         let Some(albums) = artists.get_mut(artist) else { continue; };
         let Some(album) = line.strip_prefix("Album: ") else { continue; };
 
-        albums.insert(album.to_owned());
+        let Ok(release_date) = self.album_release_date(artist, album) else {
+          eprintln!("Release date not found for artist/album {}/{}", artist, album);
+          continue;
+        };
+
+        let release = common::Release {
+          title: album.to_owned(),
+          date: release_date.to_owned(),
+        };
+
+        albums.push(release);
+        albums.sort_by_key(|album| album.date.clone());
       }
     }
 
     return Ok(artists);
+  }
+
+  pub fn album_release_date(&mut self, artist: &str, album: &str) -> io::Result<String> {
+    let command = format!("find album \"{album}\" artist \"{artist}\"");
+    let response = self.send_command(&command)?;
+
+    for line in response {
+      if line.starts_with("Date: ") {
+        let Some(release_date) = line.strip_prefix("Date: ") else { continue; };
+        return Ok(release_date.to_string());
+      }
+    }
+
+    return Err(io::Error::new(io::ErrorKind::Other, "No release date found for album"));
   }
 
   pub fn send_command(&mut self, command: &str) -> io::Result<Vec<String>> {
