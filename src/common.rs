@@ -3,17 +3,20 @@ use serde;
 #[derive(serde::Deserialize)]
 pub struct Artist {
   pub id: String,
-  // name: String,
   pub score: i32,
 }
 
-// TODO: move this to a separate file for abstraction
-#[derive(serde::Deserialize)]
-pub struct Release {
-  // id: String,
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+pub struct Album {
   pub title: String,
-  #[serde(rename = "first-release-date")]
-  pub date: String,
+  #[serde(rename="first-release-date", skip_serializing)]
+  pub date: Option<String>,
+}
+
+impl PartialEq for Album {
+  fn eq(&self, other: &Self) -> bool {
+    return self.title == other.title;
+  }
 }
 
 #[derive(serde::Deserialize)]
@@ -22,7 +25,7 @@ pub struct Artists {
 }
 
 #[derive(serde::Deserialize)]
-pub struct Releases {
+pub struct ReleaseGroups {
   #[serde(rename = "release-groups")]
-  pub release_groups: Vec<Release>,
+  pub release_groups: Vec<Album>,
 }

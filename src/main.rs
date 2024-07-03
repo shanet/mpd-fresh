@@ -1,49 +1,59 @@
-use std::collections::{HashMap};
+use std::collections::BTreeMap;
+use std::io::{self, Write};
 use std::process;
-use std::fs;
-use std::io;
-use clap;
 
 mod common;
+mod config;
+mod data_store;
 mod mpd;
 mod musicbrainz;
 
 fn main() {
-  let arguments = parse_args();
-  let host = format!("{}:{}", arguments.get_one::<String>("server").unwrap(), arguments.get_one::<String>("port").unwrap());
+  let mut data_store = data_store::DataStore::new().unwrap_or_else(|error| {
+    eprintln!("Failed to parse ignored YAML file: {}", error);
+    process::exit(1);
+  });
 
-  // let albums = mpd_albums(&host);
+  println!("Getting release date info from MPD...");
+  let all_albums = get_albums_from_mpd(&config::mpd_host(), config::mpd_password().as_deref());
 
-  // for (artist, albums) in albums {
-    // check_for_new_releases(&artist, albums);
-  // }
+  println!("{}Getting new releases from MusicBrainz...", (if config::is_verbose() {""} else {"\n"}));
+  let mut index = 1;
 
-  load_ignored_releases();
+  for (artist, albums) in &all_albums {
+    // let artist = "Autopilot Off";
+    // let albums = vec![];
+    let ignored_albums = data_store.ignored_albums_for_artist(&artist);
 
-  let new_releases = check_for_new_releases("Chvrches", vec![common::Release {title: "Screen Violence".to_string(), date: "2020-01-01".to_string()}]);
+    config::print_status(&format!("{}/{}: {}", index, all_albums.len(), artist));
 
-  for release in new_releases {
-    println!("New release from {}: {} ({})", "Chvrches", release.title, release.date);
+    let new_albums = check_new_albums_for_artist(&artist, &albums, &ignored_albums);
+
+    for new_album in new_albums {
+      if config::ignore_all_albums() || prompt_for_ignore(&artist, &new_album) {
+        if config::is_verbose() { println!("Ignoring: {}/{}", artist, new_album.title); }
+        data_store.add_ignored_album_for_artist(&artist, new_album);
+      }
+    }
+
+    // Sleep between requests to avoid hitting the rate limit
+    musicbrainz::MusicBrainz::rate_limit_wait();
+
+    index += 1;
   }
-  // print new release
-  // ask to ignore?
-  // write to ignored yaml file
+
+  if config::is_verbose() { println!("Writing results to ignore file"); }
+  let _ = data_store.save().unwrap_or_else(|error| {
+    eprintln!("{}Failed to saved ignored file: {}", (if config::is_verbose() {""} else {"\n"}), error);
+    process::exit(1);
+  });
 }
 
-fn load_ignored_releases() {
-  let mut file = fs::File::open("ignored.yml");
-  let mut contents = String::new();
-  file.read_to_string(&contents);
-  let config = serde_yaml::from_str(&contents);
-}
-
-fn mpd_albums(host: &str) -> HashMap<String, Vec<common::Release>> {
-  let mut mpd_client = mpd::MpdClient::new(host);
+fn get_albums_from_mpd(host: &str, password: Option<&str>) -> BTreeMap<String, Vec<common::Album>> {
+  let mut mpd_client = mpd::MpdClient::new(host, password);
 
   match mpd_client.connect() {
-    Ok(()) => {
-      println!("Connected to MPD server at {}", mpd_client.host);
-    }
+    Ok(()) => {if config::is_verbose() { println!("Connected to MPD server at {}", mpd_client.host); }}
 
     Err(error) => {
       eprintln!("Failed to connect to MPD: {}", error);
@@ -64,29 +74,33 @@ fn mpd_albums(host: &str) -> HashMap<String, Vec<common::Release>> {
   }
 }
 
-fn check_for_new_releases(artist: &str, albums: Vec<common::Release>) -> Vec<common::Release> {
-  if artist != "Chvrches" { return Vec::new(); }
+fn check_new_albums_for_artist(artist: &str, known_albums: &Vec<common::Album>, ignored_albums: &Vec<common::Album>) -> Vec<common::Album> {
+  match musicbrainz::MusicBrainz::albums_for_artist(artist) {
+    Ok(all_albums) => {
+      // Known albums should be sorted by date. Use the last one as the most recent. If there are none, then all of the albums are new.
+      let Some(last_album) = &known_albums.last() else { return all_albums; };
+      let mut new_albums = Vec::new();
 
-  match musicbrainz::MusicBrainz::releases_for_artist(artist) {
-    Ok(releases) => {
-      // let Some(most_recent_release) = &releases.last() else { return Vec::new(); };
-      let Some(last_album) = &albums.last() else { return Vec::new(); };
-
-      let mut new_releases = Vec::new();
-
-      for release in releases {
-        if release.date > last_album.date { // todo: and not ignored already
-          new_releases.push(release);
+      for album in all_albums {
+        if album.date > last_album.date && !ignored_albums.contains(&album) {
+          new_albums.push(album);
         }
       }
 
-      return new_releases;
+      return new_albums;
     }
 
     Err(error) => {
       match error.status() {
-        Some(status) => { eprintln!("API error: {}", status.as_str()); }
-        None => { eprintln!("API error: Unknown error"); }
+        Some(status) => {
+          if status.as_str() == "503" {
+            eprintln!("{}API error: Rate limited", (if config::is_verbose() {""} else {"\n"}));
+          } else {
+            eprintln!("{}API error: {}", (if config::is_verbose() {""} else {"\n"}), status.as_str());
+          }
+        }
+
+        None => eprintln!("{}API error: Unknown error", (if config::is_verbose() {""} else {"\n"}))
       }
 
       return Vec::new();
@@ -94,20 +108,15 @@ fn check_for_new_releases(artist: &str, albums: Vec<common::Release>) -> Vec<com
   }
 }
 
-fn parse_args() -> clap::ArgMatches {
-  return clap::Command::new("mpd-fresh")
-    .arg(clap::Arg::new("server")
-      .short('s')
-      .long("server")
-      .help("MPD server to connect to")
-      .default_value("localhost"))
-    .arg(clap::Arg::new("port")
-      .short('p')
-      .long("port")
-      .help("MPD port to connect to")
-      .default_value("6600"))
-    .get_matches();
+fn prompt_for_ignore(artist: &str, album: &common::Album) -> bool {
+  print!("New release: {} - {} ({}). Ignore? (Y,n) ", artist, album.title, album.date.as_deref().unwrap_or("unknown date"));
+  let _ = io::stdout().flush();
 
-    // TODO: support passwords
-    // TODO: support singles and EP release types
+  let mut input = String::new();
+  let _ = io::stdin().read_line(&mut input);
+
+  input.make_ascii_lowercase();
+  let answer = input.trim();
+
+  return answer == "y" || answer == "";
 }
