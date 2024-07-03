@@ -9,6 +9,8 @@ mod mpd;
 mod musicbrainz;
 
 fn main() {
+  config::parse_arguments();
+
   let mut data_store = data_store::DataStore::new().unwrap_or_else(|error| {
     eprintln!("Failed to parse ignored YAML file: {}", error);
     process::exit(1);

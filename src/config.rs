@@ -48,7 +48,7 @@ pub fn print_status(message: &str) {
   }
 }
 
-fn parse_arguments() -> clap::ArgMatches {
+pub fn parse_arguments() -> clap::ArgMatches {
   return clap::Command::new("mpd-fresh")
     .arg(clap::Arg::new("server")
       .short('s')
