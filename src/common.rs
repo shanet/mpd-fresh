@@ -3,6 +3,7 @@ use serde;
 #[derive(serde::Deserialize)]
 pub struct Artist {
   pub id: String,
+  pub name: String,
   pub score: i32,
 }
 
@@ -15,7 +16,7 @@ pub struct Album {
 
 impl PartialEq for Album {
   fn eq(&self, other: &Self) -> bool {
-    return self.title == other.title;
+    return self.title.eq_ignore_ascii_case(&other.title);
   }
 }
 

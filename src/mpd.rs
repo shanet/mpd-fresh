@@ -53,10 +53,19 @@ impl<'a> MpdClient<'a> {
     }
   }
 
-  pub fn all_albums(&mut self) -> io::Result<BTreeMap<String, Vec<common::Album>>> {
-    let response = self.send_command("list album group artist")?;
-
+  pub fn all_albums(&mut self, artist: Option<&str>) -> io::Result<BTreeMap<String, Vec<common::Album>>> {
     let mut artists = BTreeMap::new();
+
+    let command = match artist {
+      Some(artist) => {
+        artists.insert(artist.to_owned(), Vec::new());
+        format!("list album artist {}", artist)
+      }
+      None => { "list album group artist".to_string() }
+    };
+
+    let response = self.send_command(&command)?;
+
     let mut recent_artist = None;
     let artist_count = self.artist_count().unwrap_or(0);
     let mut artist_index = 1;

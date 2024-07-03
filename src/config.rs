@@ -27,6 +27,12 @@ pub fn mpd_password() -> Option<String> {
   }
 }
 
+pub fn artist() -> Option<String> {
+  unsafe {
+    return PARSED_ARGS.get_one::<String>("artist").cloned();
+  }
+}
+
 pub fn print_status(message: &str) {
   static mut LAST_MESSAGE_LENGTH: usize = 0;
 
@@ -69,6 +75,10 @@ pub fn parse_arguments() -> clap::ArgMatches {
       .long("ignore")
       .help("Ignore all new releases (useful for an initial run to avoid many prompts)")
       .num_args(0))
+    .arg(clap::Arg::new("artist")
+      .short('a')
+      .long("artist")
+      .help("Only check a single artist"))
     .arg(clap::Arg::new("verbose")
       .short('v')
       .long("verbose")

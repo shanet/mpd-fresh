@@ -17,19 +17,22 @@ fn main() {
   });
 
   println!("Getting release date info from MPD...");
-  let all_albums = get_albums_from_mpd(&config::mpd_host(), config::mpd_password().as_deref());
+  let all_albums = get_albums_from_mpd();
 
   println!("{}Getting new releases from MusicBrainz...", (if config::is_verbose() {""} else {"\n"}));
   let mut index = 1;
 
   for (artist, albums) in &all_albums {
-    // let artist = "Autopilot Off";
-    // let albums = vec![];
     let ignored_albums = data_store.ignored_albums_for_artist(&artist);
 
     config::print_status(&format!("{}/{}: {}", index, all_albums.len(), artist));
 
     let new_albums = check_new_albums_for_artist(&artist, &albums, &ignored_albums);
+
+    // Ugly, but we need a newline here to put the first prompt on its own line when not in verbose mode
+    if !config::ignore_all_albums() && !config::is_verbose() && new_albums.len() > 0 {
+      println!();
+    }
 
     for new_album in new_albums {
       if config::ignore_all_albums() || prompt_for_ignore(&artist, &new_album) {
@@ -51,8 +54,10 @@ fn main() {
   });
 }
 
-fn get_albums_from_mpd(host: &str, password: Option<&str>) -> BTreeMap<String, Vec<common::Album>> {
-  let mut mpd_client = mpd::MpdClient::new(host, password);
+fn get_albums_from_mpd() -> BTreeMap<String, Vec<common::Album>> {
+  let host = config::mpd_host();
+  let password = config::mpd_password();
+  let mut mpd_client = mpd::MpdClient::new(&host, password.as_deref());
 
   match mpd_client.connect() {
     Ok(()) => {if config::is_verbose() { println!("Connected to MPD server at {}", mpd_client.host); }}
@@ -63,7 +68,7 @@ fn get_albums_from_mpd(host: &str, password: Option<&str>) -> BTreeMap<String, V
     }
   }
 
-  match mpd_client.all_albums() {
+  match mpd_client.all_albums(config::artist().as_deref()) {
     Ok(artists) => {
       let _ = mpd_client.disconnect();
       return artists;
