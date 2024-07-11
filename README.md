@@ -1,7 +1,7 @@
 mpd-fresh
 =========
 
-mpd-fresh is a small utility that scans your MPD library for any new releases from your artists.
+mpd-fresh is a small utility that scans your [MPD](https://www.musicpd.org/) library for any new releases from your artists.
 
 It relies on the [MusicBrainz API](https://musicbrainz.org/) to check for new releases for a given artist. This API is limited to one request per second so scanning a large music library may take a while to iterate through all artists.
 
@@ -20,6 +20,8 @@ In this case, mpd-fresh would only identify "Album 4" as a new album as it is no
 mpd-fresh will prompt you to ignore any found new releases so as to not keep asking about new releases you may never include in your library. This ignore file is stored in YAML format at `~/.config/mpd_fresh_ignored.yml`.
 
 ## Installation
+
+Note: Ensure that `~/.cargo/bin` is in your `$PATH`.
 
 ```bash
 $ cargo install mpd-fresh
