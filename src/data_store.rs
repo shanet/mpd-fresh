@@ -21,10 +21,12 @@ impl DataStore {
       }
 
       Err(error) => {
+        // Only fail if there was a YAML error
         if let Some(_) = error.downcast_ref::<serde_yaml::Error>() {
           return Err(error);
         }
 
+        // Other errors are fine, just assume an empty data store if so
         return Ok(DataStore {
           map: BTreeMap::new(),
         });

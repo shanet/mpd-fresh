@@ -84,9 +84,12 @@ fn get_albums_from_mpd() -> BTreeMap<String, Vec<common::Album>> {
 fn check_new_albums_for_artist(artist: &str, known_albums: &Vec<common::Album>, ignored_albums: &Vec<common::Album>) -> Vec<common::Album> {
   match musicbrainz::MusicBrainz::albums_for_artist(artist) {
     Ok(all_albums) => {
-      // Known albums should be sorted by date. Use the last one as the most recent. If there are none, then all of the albums are new.
-      let Some(last_album) = &known_albums.last() else { return all_albums; };
       let mut new_albums = Vec::new();
+
+      // Known albums should be sorted by date. Use the last one as the most recent.
+      // It doesn't make sense for an artist in the library to not have any albums so if this is the
+      // case then return no new albums as this must be a compilation artist or something else odd.
+      let Some(last_album) = &known_albums.last() else { return new_albums; };
 
       for album in all_albums {
         if album.date > last_album.date && !ignored_albums.contains(&album) {

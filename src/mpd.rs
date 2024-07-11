@@ -76,6 +76,12 @@ impl<'a> MpdClient<'a> {
       if line.starts_with("Artist: ") {
         let Some(artist) = line.strip_prefix("Artist: ") else { continue; };
 
+        // Skip any blank artists
+        if artist == "" {
+          recent_artist = None;
+          continue;
+        }
+
         artists.insert(artist.to_owned(), Vec::new());
         recent_artist = Some(artist.to_owned());
 
