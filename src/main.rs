@@ -20,11 +20,12 @@ fn main() {
   let all_albums = get_albums_from_mpd();
 
   println!("{}Getting new releases from MusicBrainz...", (if config::is_verbose() {""} else {"\n"}));
-  let mut index = 1;
+  let mut index = 0;
 
   for (artist, albums) in &all_albums {
     let ignored_albums = data_store.ignored_albums_for_artist(&artist);
 
+    index += 1;
     config::print_status(&format!("{}/{}: {}", index, all_albums.len(), artist));
 
     let new_albums = check_new_albums_for_artist(&artist, &albums, &ignored_albums);
@@ -43,8 +44,6 @@ fn main() {
 
     // Sleep between requests to avoid hitting the rate limit
     musicbrainz::MusicBrainz::rate_limit_wait();
-
-    index += 1;
   }
 
   if config::is_verbose() { println!("Writing results to ignore file"); }

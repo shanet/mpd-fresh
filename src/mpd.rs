@@ -68,12 +68,13 @@ impl<'a> MpdClient<'a> {
 
     let mut recent_artist = None;
     let artist_count = self.artist_count().unwrap_or(0);
-    let mut artist_index = 1;
+    let mut artist_index = 0;
 
     for line in response {
       // The response format is a flat list of "Artist:" lines followed by "Album:" lines so we need
       // to track what the last encountered artist was so it can be matched to it's following albums
       if line.starts_with("Artist: ") {
+        artist_index += 1;
         let Some(artist) = line.strip_prefix("Artist: ") else { continue; };
 
         // Skip any blank artists
@@ -86,7 +87,6 @@ impl<'a> MpdClient<'a> {
         recent_artist = Some(artist.to_owned());
 
         config::print_status(&format!("{}/{}: {}", artist_index, artist_count, artist));
-        artist_index += 1;
       } else if line.starts_with("Album: ") {
         let Some(ref artist) = recent_artist else { continue; };
         let Some(albums) = artists.get_mut(artist) else { continue; };
