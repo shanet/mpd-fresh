@@ -20,30 +20,40 @@ fn main() {
   let all_albums = get_albums_from_mpd();
 
   println!("{}Getting new releases from MusicBrainz...", (if config::is_verbose() {""} else {"\n"}));
+  let mut new_albums = BTreeMap::new();
+  let mut new_albums_count = 0;
   let mut index = 0;
 
   for (artist, albums) in &all_albums {
-    let ignored_albums = data_store.ignored_albums_for_artist(&artist);
-
     index += 1;
-    config::print_status(&format!("{}/{}: {}", index, all_albums.len(), artist));
 
-    let new_albums = check_new_albums_for_artist(&artist, &albums, &ignored_albums);
+    let ignored_albums = data_store.ignored_albums_for_artist(&artist);
+    config::print_status(&format!("({}/{}) {}", index, all_albums.len(), artist));
 
-    // Ugly, but we need a newline here to put the first prompt on its own line when not in verbose mode
-    if !config::ignore_all_albums() && !config::is_verbose() && new_albums.len() > 0 {
-      println!();
-    }
-
-    for new_album in new_albums {
-      if config::ignore_all_albums() || prompt_for_ignore(&artist, &new_album) {
-        if config::is_verbose() { println!("Ignoring: {}/{}", artist, new_album.title); }
-        data_store.add_ignored_album_for_artist(&artist, new_album);
-      }
-    }
+    let artist_new_albums = check_new_albums_for_artist(&artist, &albums, &ignored_albums);
+    new_albums_count += artist_new_albums.len();
+    new_albums.insert(artist, artist_new_albums);
 
     // Sleep between requests to avoid hitting the rate limit
     musicbrainz::MusicBrainz::rate_limit_wait();
+  }
+
+  // Print a newline so the prompts below start on their own line apart from the status output above
+  println!("");
+
+  index = 1;
+
+  for (artist, albums) in new_albums {
+    for album in albums {
+      let prefix = format!("{}/{}: ", index, new_albums_count);
+      index += 1;
+
+      if config::ignore_all_albums() || prompt_for_ignore(&artist, &album, &prefix) {
+        if config::is_verbose() { println!("Ignoring: {}/{}", artist, album.title); }
+
+        data_store.add_ignored_album_for_artist(&artist, album);
+      }
+    }
   }
 
   if config::is_verbose() { println!("Writing results to ignore file"); }
@@ -117,8 +127,8 @@ fn check_new_albums_for_artist(artist: &str, known_albums: &Vec<common::Album>, 
   }
 }
 
-fn prompt_for_ignore(artist: &str, album: &common::Album) -> bool {
-  print!("New release: {} - {} ({}). Ignore? (Y,n) ", artist, album.title, album.date.as_deref().unwrap_or("unknown date"));
+fn prompt_for_ignore(artist: &str, album: &common::Album, prefix: &str) -> bool {
+  print!("({}) New release: {} - {} ({}). Ignore? (Y,n) ", prefix, artist, album.title, album.date.as_deref().unwrap_or("unknown date"));
   let _ = io::stdout().flush();
 
   let mut input = String::new();

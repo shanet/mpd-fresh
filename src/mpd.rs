@@ -86,7 +86,7 @@ impl<'a> MpdClient<'a> {
         artists.insert(artist.to_owned(), Vec::new());
         recent_artist = Some(artist.to_owned());
 
-        config::print_status(&format!("{}/{}: {}", artist_index, artist_count, artist));
+        config::print_status(&format!("({}/{}) {}", artist_index, artist_count, artist));
       } else if line.starts_with("Album: ") {
         let Some(ref artist) = recent_artist else { continue; };
         let Some(albums) = artists.get_mut(artist) else { continue; };
