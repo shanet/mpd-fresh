@@ -9,7 +9,7 @@ license     = "GPL-3.0-only"
 name        = "mpd-fresh"
 readme      = "README.md"
 repository  = "https://github.com/shanet/mpd-fresh"
-version     = "0.1.1"
+version     = "0.2.0"
 
 [dependencies]
 clap             = "4.5.4"
