@@ -60,14 +60,24 @@ impl DataStore {
   }
 
   fn ignored_config_path() -> String {
-    match env::var("HOME") {
-      Ok(home_directory) => {
-        return format!("{}/.config/{}", home_directory, IGNORED_FILENAME);
+    // Try to use the specified XDG config directory first
+    match env::var("XDG_CONFIG_HOME") {
+      Ok(config_directory) => {
+        return format!("{}/{}", config_directory, IGNORED_FILENAME);
       }
 
       Err(_) => {
-        eprintln!("WARNING: $HOME not found, using current directory for ignored config file");
-        return IGNORED_FILENAME.to_string();
+        // Fall back to a hardcoded ~/.config if an XDG config wasn't found
+        match env::var("HOME") {
+          Ok(home_directory) => {
+            return format!("{}/.config/{}", home_directory, IGNORED_FILENAME);
+          }
+
+          Err(_) => {
+            eprintln!("WARNING: $HOME not found, using current directory for ignored config file");
+            return IGNORED_FILENAME.to_string();
+          }
+        }
       }
     }
   }
