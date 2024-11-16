@@ -22,11 +22,17 @@ impl MusicBrainz {
     let release_arguments = format!("artist={artist_id}&type=album");
 
     let response = Self::query("release-group", &release_arguments)?;
+    let releases = response.json::<common::ReleaseGroups>()?;
 
-    let mut releases = response.json::<common::ReleaseGroups>()?;
-    releases.release_groups.sort_by_key(|album| album.date.clone());
+    // Filter out anything that's not a primary album release and then convert the Release structs to a generic Album struct
+    let mut albums: Vec<common::Album> = releases.release_groups.into_iter()
+      .filter(|release| release.primary_type == "Album" && release.secondary_types.len() == 0)
+      .map(|release| common::Album{title: release.title.clone(), date: Some(release.date.clone())})
+      .collect();
 
-    return Ok(releases.release_groups);
+    albums.sort_by_key(|album| album.date.clone());
+
+    return Ok(albums);
   }
 
   pub fn query(entity: &str, query: &str) -> Result<reqwest::blocking::Response, reqwest::Error> {

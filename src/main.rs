@@ -45,7 +45,7 @@ fn main() {
 
   for (artist, albums) in new_albums {
     for album in albums {
-      let prefix = format!("{}/{}: ", index, new_albums_count);
+      let prefix = format!("{}/{}", index, new_albums_count);
       index += 1;
 
       if config::ignore_all_albums() || prompt_for_ignore(&artist, &album, &prefix) {

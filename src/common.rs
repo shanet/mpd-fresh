@@ -10,7 +10,6 @@ pub struct Artist {
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub struct Album {
   pub title: String,
-  #[serde(rename="first-release-date", skip_serializing)]
   pub date: Option<String>,
 }
 
@@ -25,8 +24,19 @@ pub struct Artists {
   pub artists: Vec<Artist>,
 }
 
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+pub struct Release {
+  pub title: String,
+  #[serde(rename="first-release-date", skip_serializing)]
+  pub date: String,
+  #[serde(rename = "primary-type")]
+  pub primary_type: String,
+  #[serde(rename = "secondary-types")]
+  pub secondary_types: Vec<String>,
+}
+
 #[derive(serde::Deserialize)]
 pub struct ReleaseGroups {
   #[serde(rename = "release-groups")]
-  pub release_groups: Vec<Album>,
+  pub release_groups: Vec<Release>,
 }

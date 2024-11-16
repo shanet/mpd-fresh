@@ -59,14 +59,14 @@ impl<'a> MpdClient<'a> {
     let command = match artist {
       Some(artist) => {
         artists.insert(artist.to_owned(), Vec::new());
-        format!("list album artist {}", artist)
+        format!("list album artist \"{}\"", artist)
       }
       None => { "list album group artist".to_string() }
     };
 
     let response = self.send_command(&command)?;
 
-    let mut recent_artist = None;
+    let mut recent_artist: Option<String> = artist.map(|artist| artist.to_owned());
     let artist_count = self.artist_count().unwrap_or(0);
     let mut artist_index = 0;
 
@@ -75,25 +75,25 @@ impl<'a> MpdClient<'a> {
       // to track what the last encountered artist was so it can be matched to it's following albums
       if line.starts_with("Artist: ") {
         artist_index += 1;
-        let Some(artist) = line.strip_prefix("Artist: ") else { continue; };
+        let Some(current_artist) = line.strip_prefix("Artist: ") else { continue; };
 
         // Skip any blank artists
-        if artist == "" {
+        if current_artist == "" {
           recent_artist = None;
           continue;
         }
 
-        artists.insert(artist.to_owned(), Vec::new());
-        recent_artist = Some(artist.to_owned());
+        artists.insert(current_artist.to_owned(), Vec::new());
+        recent_artist = Some(current_artist.to_owned());
 
-        config::print_status(&format!("({}/{}) {}", artist_index, artist_count, artist));
+        config::print_status(&format!("({}/{}) {}", artist_index, artist_count, current_artist));
       } else if line.starts_with("Album: ") {
-        let Some(ref artist) = recent_artist else { continue; };
-        let Some(albums) = artists.get_mut(artist) else { continue; };
+        let Some(ref current_artist) = recent_artist else { continue; };
+        let Some(albums) = artists.get_mut(current_artist) else { continue; };
         let Some(album) = line.strip_prefix("Album: ") else { continue; };
 
-        let Ok(release_date) = self.album_release_date(artist, album) else {
-          if config::is_verbose() { eprintln!("Release date not found for: {} - {}", artist, album); }
+        let Ok(release_date) = self.album_release_date(current_artist, album) else {
+          if config::is_verbose() { eprintln!("Release date not found for: {} - {}", current_artist, album); }
           continue;
         };
 
